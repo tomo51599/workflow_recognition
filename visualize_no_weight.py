@@ -10,6 +10,8 @@ import numpy as np
 import tensorflow as tf
 import pathlib
 import random
+import collections
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -182,31 +184,42 @@ model = keras.models.load_model("master_thesis/system_files/test_model_9.keras",
 #モデルのロード##################################################
 
 
-# XML読み込み関数
+#ビデオの表示####################################################
+xml_no = "040"
+xml_path = os.path.join("master_thesis", "data", "xml", f"{xml_no}.xml")
+print(xml_path)
+
+#xml読み込み
 def get_xml(xml_path):
     tree = ET.parse(xml_path)
     root = tree.getroot()
+    
     return tree, root
 
-# ビデオ情報取得関数
+#情報を取得
 def get_video_info(root):
     video_name = root.find("videoName").text
     phases = []
+    
     for phase in root.findall("phase"):
         phase_no = int(phase.find("phaseNo").text)
         first_frame = int(phase.find("firstFrameNo").text)
         last_frame = int(phase.find("lastFrameNo").text)
         phases.append((phase_no, first_frame, last_frame))
+    
     return video_name, phases
 
-# 現在のフェーズを決定する関数
+#現在のフェーズを決定する関数
 def get_current_phase(frame_No, phases):
+    
     for phase_no, first_frame, last_frame in phases:
         if first_frame <= frame_No <= last_frame:
+            
             return phase_no
+      
     return None
 
-# ファイル名の決定関数
+#ファイル名の決定関数
 def get_last_saved_number(save_dir):
     if not os.path.exists(save_dir):
         return 0
@@ -216,19 +229,21 @@ def get_last_saved_number(save_dir):
         return 0
     return max(numbers)    
 
-# ビデオのクロップ
+#ビデオのクロップ
 def start_new_video(save_dir, fps, width, height):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # ファイルフォーマット
     file_counter = get_last_saved_number(save_dir) + 1  # 更新された関数を使用
     file_path = os.path.join(save_dir, f"{file_counter}.mp4")
     out = cv2.VideoWriter(file_path, fourcc, fps, (width, height))
+    file_path = os.path.join(save_dir, f"{file_counter - 1}.mp4")
     return out, file_path
 
-# フレーム処理
+#フレーム処理
 def format_frames(frame, output_size):
-    frame = tf.image.convert_image_dtype(frame, tf.float32)
-    frame = tf.image.resize_with_pad(frame, *output_size)
-    return frame
+  
+  frame = tf.image.convert_image_dtype(frame, tf.float32)
+  frame = tf.image.resize_with_pad(frame, *output_size)
+  return frame
 
 def frames_from_video_file(video_path, n_frames, output_size=(224, 224), frame_step=2):
     result = []
@@ -266,196 +281,259 @@ def frames_from_video_file(video_path, n_frames, output_size=(224, 224), frame_s
     return result
 
 class FrameGenerator:
-    def __init__(self, path, n_frames, training=False):
-        if os.path.isdir(path):
-            self.path = pathlib.Path(path)
-            self.class_names = sorted(set(p.name for p in self.path.iterdir() if p.is_dir()))
-            self.class_ids_for_name = dict((name, idx) for idx, name in enumerate(self.class_names))
-        elif os.path.isfile(path):
-            self.path = [pathlib.Path(path)]  # リストとして保持
-            self.class_names = ['single_file']
-            self.class_ids_for_name = {'single_file': 0}
-        self.n_frames = n_frames
-        self.training = training
+  
+  def __init__(self, path, n_frames, training=False):
+    # pathがディレクトリかファイルかをチェック
+    if os.path.isdir(path):
+      self.path = pathlib.Path(path)
+      self.class_names = sorted(set(p.name for p in self.path.iterdir() if p.is_dir()))
+      self.class_ids_for_name = dict((name, idx) for idx, name in enumerate(self.class_names))
+    elif os.path.isfile(path):
+      self.path = [pathlib.Path(path)]  # リストとして保持
+      self.class_names = ['single_file']
+      self.class_ids_for_name = {'single_file': 0}
+    #else:
+      #raise ValueError(f"Provided path {path} is neither a directory nor a file.")
+    self.n_frames = n_frames
+    self.training = training
 
-    def get_files_and_class_names(self):
-        if 'single_file' in self.class_names:
-            return self.path, self.class_names  # 単一ファイルの場合
-        else:
-            video_paths = list(self.path.glob('*/*.mp4'))
-            classes = [p.parent.name for p in video_paths]
-            return video_paths, classes
+  def get_files_and_class_names(self):
+    if 'single_file' in self.class_names:
+      return self.path, self.class_names  # 単一ファイルの場合
+    else:
+      video_paths = list(self.path.glob('*/*.mp4'))
+      classes = [p.parent.name for p in video_paths]
+      return video_paths, classes
 
-    def __call__(self):
-        video_paths, classes = self.get_files_and_class_names()
-        pairs = list(zip(video_paths, classes))
-        if self.training:
-            random.shuffle(pairs)
-        for path, name in pairs:
-            video_frames = frames_from_video_file(path, self.n_frames)
-            label = self.class_ids_for_name[name]  # Encode labels
-            yield video_frames, label
+  def __call__(self):
+    video_paths, classes = self.get_files_and_class_names()
 
+    pairs = list(zip(video_paths, classes))
+
+    if self.training:
+      random.shuffle(pairs)
+
+    for path, name in pairs:
+      video_frames = frames_from_video_file(path, self.n_frames)
+      label = self.class_ids_for_name[name]  # Encode labels
+      yield video_frames, label
+      
 # 推論を実行する関数
 def get_actual_predicted_labels(dataset): 
-    predicted = model.predict(dataset)
-    predict_probability = predicted
-    predicted = tf.concat(predicted, axis=0)
-    predicted = tf.argmax(predicted, axis=1)
-    return predicted, predict_probability
 
-# 1番目に信頼度の高いクラスの確率値を取得
+  predicted = model.predict(dataset)
+  predict_probability = predicted
+  
+  predicted = tf.concat(predicted, axis=0)
+  predicted = tf.argmax(predicted, axis=1)
+
+  return predicted, predict_probability
+
+#1番目に信頼度の高いクラスの確率値を取得
 def get_first_predict_labels(predict_probability):
+    
     probabilities = np.array(predict_probability)
     sorted_indices = np.argsort(probabilities)[::-1]
     first_largest_index = sorted_indices[0]
     first_largest_probability = probabilities[first_largest_index]
-    return first_largest_probability
+    
+    return  first_largest_probability
 
-# 2番目に信頼度の高いクラスの確率値とクラス名を取得
+#2番目に信頼度の高いクラスの確率値とクラス名を取得
 def get_second_predict_labels(predict_probability, class_names):
+    
     probabilities = np.array(predict_probability)
     sorted_indices = np.argsort(probabilities)[::-1]
     second_largest_index = sorted_indices[1]
     second_largest_probability = probabilities[second_largest_index]
     second_largest_class = class_names[second_largest_index]
+    
     return second_largest_class, second_largest_probability
 
-# 真値の確率値を取得
+#真値の確率値を取得
 def get_current_phase_probability(predict_probability, current_phase):
-    if current_phase is not None: 
+   
+   if current_phase is not None: 
         current_phase_cal = current_phase - 1
         current_phase_probability =  predict_probability[current_phase_cal]
+        
         return current_phase_probability
-    else:
-        return None
+    
+   else:
+       return None
 
-# 推定値のカウント
+#推定値のカウント
 def count_prediction(predicted_phase_No, current_phase, results):
+   
     if current_phase is not None:
         results[current_phase][predicted_phase_No] += 1
+    
     return results
 
-# 複数のXMLファイルを連続して処理する関数
-def process_multiple_videos(xml_files, base_xml_path, base_video_path):
-    overall_results = np.zeros((6, 6))  # 全体の結果を格納する配列
-    results_dict = {}  # 各XMLファイルの結果を格納する辞書
-    
-    for xml_no in xml_files:
-        xml_path = os.path.join(base_xml_path, f"{xml_no}.xml")
-        tree, root = get_xml(xml_path)
-        video_name, phases = get_video_info(root)
-        video_path = os.path.join(base_video_path, video_name)
-        results = process_video(video_path, phases, xml_no)
-        overall_results += results  # 各ビデオの結果を全体の結果に加算
-        results_dict[xml_no] = results  # 各ビデオの結果を辞書に格納
-    
-    return overall_results, results_dict
+# リボン図の生成関数
+def generate_ribbon_plot(predict_results, xml_no):
+    fig, ax = plt.subplots(figsize=(15, 5))
+    colors = ['orange', 'yellow', 'blue', 'black', 'green', 'purple']
+    phases = sorted(predict_results.keys())
+    for phase in phases:
+        for frame_No, predicted_phase in predict_results[phase]:
+            predicted_phase = int(predicted_phase)
+            ax.scatter(frame_No, phase, c=colors[predicted_phase-1], label=f'Phase {predicted_phase}', s=10)
+    ax.set_xlabel('Time (Frame Number)')
+    ax.set_ylabel('Phase')
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys(), loc='upper left', bbox_to_anchor=(1, 1), title="Legend")
+    plt.title(f'Phase Recognition Ribbon Plot for Test_{xml_no}')
+    plt.tight_layout()
+    plt.savefig(f'/home/master_thesis/ribbon_plot_{xml_no}_No_weight.png') 
+               
+# メイン処理
+tree, root = get_xml(xml_path)
+video_name, phases = get_video_info(root)
 
-# ビデオを処理するメイン関数
-def process_video(video_path, phases, xml_no):
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    delay = int(1000 / fps)
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_No = 0
-    current_phase = None
-    video_writer = None
-    n_frames = 24
-    batch_size = 1
-    predicted_labels = None
-    output_signature = (tf.TensorSpec(shape=(None, None, None, 3), dtype=tf.float32),
-                        tf.TensorSpec(shape=(), dtype=tf.int16))
-    class_names = ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6']
-    result_dict = {}
-    class_name_to_index = {name: idx for idx, name in enumerate(class_names)}
-    results = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
+video_path = os.path.join("master_thesis", "data", "video", video_name)
+cap = cv2.VideoCapture(video_path)
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if frame is not None:
-            frame_2 = frame.copy()
-        if cv2.waitKey(5) & 0xFF == ord("q") or not ret:
-            break
-        if frame_No != 0 and frame_No % 48 == 0:
-            if video_writer is not None:
-                video_writer.release()
-                video_writer = None
-            save_dir = os.path.join("master_thesis", "data", "visualize_evaluation")
-            os.makedirs(save_dir, exist_ok=True)
-            video_writer, file_path = start_new_video(save_dir, fps, frame_width, frame_height)
+fps = cap.get(cv2.CAP_PROP_FPS)
+delay = int(1000 / fps)
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+frame_No = 0
+weight = 0
+current_phase = None
+video_writer = None
+
+n_frames = 24
+batch_size = 1
+
+predict_results = defaultdict(list)
+
+predicted_labels = None
+determined_phase = None
+dominant_phase = None
+
+output_signature = (tf.TensorSpec(shape = (None, None, None, 3), dtype = tf.float32),
+                    tf.TensorSpec(shape = (), dtype = tf.int16))
+
+class_names = ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6']
+
+
+
+class_name_to_index = {name: idx for idx, name in enumerate(class_names)}
+results = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    
+    if frame is not None:
+        frame_2 = frame.copy()
+    
+    if cv2.waitKey(5) & 0xFF == ord("q") or not ret:
+        break
+             
+    if frame_No != 0 and frame_No % 48 == 0:
+        
         if video_writer is not None:
-            video_writer.write(frame)
-        if frame_No > 49 and frame_No % 48 == 0:
-            test_ds = tf.data.Dataset.from_generator(FrameGenerator(file_path, n_frames), output_signature=output_signature)
-            test_ds = test_ds.batch(batch_size)
-            predicted, predict_probability = get_actual_predicted_labels(test_ds)
-            predicted_indices = predicted  
-            predicted_labels = [class_names[idx] for idx in predicted_indices.numpy()]
-            predict_count = [class_name_to_index[p] + 1 for p in predicted_labels]
-            if current_phase is not None:
-                for pc in predict_count:
-                    results = count_prediction(pc, current_phase, results)
-            first_largest_probability = get_first_predict_labels(predict_probability[0])
-            second_class, second_largest_probability = get_second_predict_labels(predict_probability[0], class_names)
-            current_class_probability = get_current_phase_probability(predict_probability[0], current_phase)
-            rounded_probability = np.around(np.array(predict_probability[0]), decimals=3)
-            result_dict[frame_No] = {
-                'predicted_class': predicted_labels[0],
-                'actual_class': f"phase{current_phase}",
-                'second_predict': second_class
-            }
-            current_phase = get_current_phase(frame_No, phases)
-        if predicted_labels is not None:
-            cv2.putText(frame_2,
+            video_writer.release()
+            video_writer = None
+        
+        save_dir = os.path.join("master_thesis", "data", "visualize_evaluation")
+        os.makedirs(save_dir, exist_ok=True)
+        video_writer, file_path = start_new_video(save_dir, fps, frame_width, frame_height)
+        
+    if video_writer is not None:
+        video_writer.write(frame)
+            
+    if frame_No > 49 and frame_No % 48 == 0:
+        test_ds = tf.data.Dataset.from_generator(FrameGenerator(file_path, n_frames), output_signature = output_signature) 
+        test_ds = test_ds.batch(batch_size)
+
+        
+        fg = FrameGenerator(file_path, n_frames, training=False) 
+        predicted, predict_probability = get_actual_predicted_labels(test_ds)
+        
+        predicted_indices = predicted  
+        predicted_labels = [class_names[idx] for idx in predicted_indices.numpy()]
+        predicted_labels = [int(idx.numpy() + 1) for idx in predicted_indices]
+        
+        predict_count = [class_name_to_index[p] + 1 for p in predicted_labels]
+
+        if current_phase is not None:
+            for pc in predict_count:
+                results = count_prediction(pc, current_phase, results)
+            
+            for predicted_phase in predicted_labels:
+                predict_results[current_phase].append((frame_No, predicted_phase))    
+        
+      
+
+        first_largest_probability = get_first_predict_labels(predict_probability[0])
+        second_class, second_largest_probability = get_second_predict_labels(predict_probability[0] , class_names)
+        current_class_probability = get_current_phase_probability(predict_probability[0], current_phase)
+        rounded_probability = np.around(np.array(predict_probability[0]), decimals = 3)
+                                
+        
+        current_phase = get_current_phase(frame_No, phases)
+    
+    
+    if predicted_labels is not None:
+        cv2.putText(frame_2,
                         f"actual_class:['phase{current_phase}'] predicted_class{predicted_labels} second_class:['{second_class}'] frame{frame_No}",
                         (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
                         (0, 0, 0),
-                        2)
-            cv2.putText(frame_2,
+                        2
+                        )
+        
+        cv2.putText(frame_2,
                         f"acutual_class:{'N/A' if current_class_probability is None else f'{current_class_probability:.2f}'}, predict_class:{first_largest_probability:.2f}, second_class:{second_largest_probability:.2f}",
                         (10, 55),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
                         (0, 0, 0),
-                        2)
-            cv2.putText(frame_2,
+                        2
+                        )
+        
+        cv2.putText(frame_2,
                         f"score:{rounded_probability} ",
                         (10, 80),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
                         (0, 0, 0),
-                        2)
-        cv2.imshow("video", frame_2) 
-        frame_No += 1
-    if video_writer is not None:
-        video_writer.release()
-    size = len(results)
-    conf_matrix = np.zeros((size, size))
-    for actual, predicted_counts in results.items():
-        for predicted, count in predicted_counts.items():
-            conf_matrix[actual-1, predicted-1] = count
-    conf_matrix = conf_matrix.astype(int)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="viridis", xticklabels=[f'phase{i}' for i in range(1, size+1)], yticklabels=[f'phase{i}' for i in range(1, size+1)])
-    plt.ylabel('Actual Phase')
-    plt.title(f'Confusion Matrix of Action Recognition for Test_{xml_no}_No_weight')
-    plt.savefig(f'/home/master_thesis/results/confusion_matrix_{xml_no}_No_weight.png')    
-    cap.release()
-    cv2.destroyAllWindows()
-    return conf_matrix
+                        2
+                        )
+   
 
-# 複数のXMLファイルを処理して合計結果を出力
-xml_files = [f"{i:03d}" for i in range(31, 41)]
-base_xml_path = "master_thesis/data/xml"
-base_video_path = "master_thesis/data/video"
-overall_results, results_dict = process_multiple_videos(xml_files, base_xml_path, base_video_path)
-print("Overall Results:")
-print(overall_results)
-print("Results Dictionary:")
-for key, value in results_dict.items():
-    print(f"{key}:")
-    print(value)
+
+            
+    cv2.imshow("video", frame_2) 
+            
+    frame_No += 1
+ 
+if video_writer is not None:
+    video_writer.release()
+
+print(results)
+
+size = len(results)
+conf_matrix = np.zeros((size, size))
+
+for actual, predicted_counts in results.items():
+    for predicted, count in predicted_counts.items():
+        conf_matrix[actual-1, predicted-1] = count
+        
+conf_matrix = conf_matrix.astype(int)
+
+plt.figure(figsize = (10, 8))
+sns.heatmap(conf_matrix, annot = True, fmt = "d", cmap= "viridis", xticklabels=[f'phase{i}' for i in range(1, size+1)], yticklabels=[f'phase{i}' for i in range(1, size+1)])
+plt.ylabel('Actual Phase')
+plt.title(f'Confusion Matrix of Action Recognition for Test_{xml_no}_No_weight')
+plt.savefig(f'/home/master_thesis/confusion_matrix_{xml_no}_No_weight.png')    
+
+cap.release()
+cv2.destroyAllWindows()
+
+generate_ribbon_plot(predict_results, xml_no)
