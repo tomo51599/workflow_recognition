@@ -2,7 +2,7 @@ import keras, collections
 import numpy as np
 import tensorflow as tf
 
-from system_files.custom_layer import Conv2Plus1D, ResidualMain, Project, ResizeVideo, add_residual_block
+from system_files.custom_layer import *
 from system_files.config_file import *
 from system_files.video_common_process import *
 
@@ -11,8 +11,7 @@ def get_actual_predicted_labels(dataset):
   
   predicted = model.predict(dataset)
   
-  predicted_indices = tf.argmax(predicted, axis=1).numpy()
-  predicted_label = [class_names[idx] for idx in predicted_indices]
+  predicted_label = (tf.argmax(predicted, axis=1).numpy() + 1)
   predicted = np.around(np.array(predicted[0]), decimals = 3)
   
   return predicted, predicted_label
@@ -84,13 +83,6 @@ def determine_adjusted_prediction(adjusted_probabilities, class_names):
     adjusted_predictions = [class_names[idx] for idx in adjusted_prediction_indices]
     return adjusted_predictions
 
-#推定値のカウント
-def count_prediction(predicted_phase_No, current_phase, results):
-   
-    if current_phase is not None:
-        results[current_phase][predicted_phase_No] += 1
-    
-    return results    
 
 #モデルのロード
 model = keras.models.load_model(model_path, custom_objects={

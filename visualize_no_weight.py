@@ -419,8 +419,6 @@ output_signature = (tf.TensorSpec(shape = (None, None, None, 3), dtype = tf.floa
 
 class_names = ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6']
 
-
-
 class_name_to_index = {name: idx for idx, name in enumerate(class_names)}
 results = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
 

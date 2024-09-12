@@ -1,7 +1,10 @@
 from system_files.file_info import set_xml_No, set_mode
 
-set_xml_No("040")
-set_mode("no_weight")
+xml_no = "040"
+mode = "no_weight"
+
+set_xml_No(xml_no)
+set_mode(mode)
 
 """
 view:xmlからフェーズ情報を取得し表示
