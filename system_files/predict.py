@@ -17,13 +17,13 @@ def get_actual_predicted_labels(dataset):
   return predicted, predicted_label
 
 #真値の確率値を取得
-def get_current_phase_probability(predicted, current_phase):
+def get_actual_label_prob(predicted, current_phase):
    
    if current_phase is not None: 
         current_phase_cal = current_phase - 1
-        current_phase_probability =  predicted[current_phase_cal]
+        actual_label_prob =  predicted[current_phase_cal]
         
-        return current_phase_probability
+        return actual_label_prob
     
    else:
        return None
@@ -34,20 +34,19 @@ def get_first_predict_labels(predicted):
     probabilities = np.array(predicted)
     sorted_indices = np.argsort(probabilities)[::-1]
     first_largest_index = sorted_indices[0]
-    first_largest_probability = probabilities[first_largest_index]
+    first_largest_prob = np.around(probabilities[first_largest_index], decimals = 3)
     
-    return  first_largest_probability
+    return  first_largest_prob
 
 #2番目に信頼度の高いクラスの確率値とクラス名を取得
-def get_second_predict_labels(predicted, class_names):
+def get_second_predict_labels(predicted):
     
     probabilities = np.array(predicted)
     sorted_indices = np.argsort(probabilities)[::-1]
-    second_largest_index = sorted_indices[1]
-    second_largest_probability = probabilities[second_largest_index]
-    second_largest_class = class_names[second_largest_index]
+    second_largest_class = sorted_indices[1]
+    second_largest_prob = np.around(probabilities[second_largest_class], decimals = 3)
     
-    return second_largest_class, second_largest_probability
+    return second_largest_class, second_largest_prob
 
 #支配的な推論結果を計算
 def determine_dominant_phase(predicted_list):

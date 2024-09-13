@@ -1,6 +1,8 @@
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.patches import Rectangle
 
 #結果をカウントする関数
 def count_prediction(predicted_phase, current_phase, results):
@@ -10,6 +12,7 @@ def count_prediction(predicted_phase, current_phase, results):
     
     return results
 
+#混合行列を生成する関数
 def gen_conf_matrix(results, xml_no, mode):
     
     size = len(results)
@@ -29,4 +32,9 @@ def gen_conf_matrix(results, xml_no, mode):
     
     plt.figure()        
     
+#リボン図を生成する関数(重みなし)
+def gen_ribbon_plot_no_weight(ribbon_results, xml_no):
+    plt.rcParams.update({'font.size': 14}) 
+    
+        
         
