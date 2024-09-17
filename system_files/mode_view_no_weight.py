@@ -108,7 +108,7 @@ def cap_view_no_weight(video_path, phases, xml_no, mode):
 
     executor.shutdown(wait=True)  
     gen_conf_matrix(results, xml_no, mode)
-    #gen_ribbon_plot_no_weight(ribbon_results, xml_no)
+    gen_ribbon_plot_no_weight(prediction_dict, xml_no)
 
     cv2.destroyAllWindows() 
     cap.release()  
