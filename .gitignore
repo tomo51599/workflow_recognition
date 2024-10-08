@@ -2,6 +2,3 @@ data/
 results/
 archive/
 system_files/test_model_9.keras
-visualize_no_weight.py
-visualize_weight.py
-visualize_weight copy.py

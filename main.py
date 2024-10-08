@@ -1,7 +1,7 @@
 from system_files.file_info import set_xml_No, set_mode
 
 xml_no = "040"
-mode = "no_weight"
+mode = "weight"
 
 set_xml_No(xml_no)
 set_mode(mode)

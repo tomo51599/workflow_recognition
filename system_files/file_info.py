@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 
 from system_files.mode_view import cap_view
 from system_files.mode_view_no_weight import cap_view_no_weight
+from system_files.mode_view_weight import cap_view_weight
 
 video_path = None
 xml_no_global = None
@@ -46,7 +47,7 @@ def set_mode(mode):
     elif mode == "no_weight":
         cap_view_no_weight(video_path, phases, xml_no_global, mode)
     elif mode == "weight":
-        print("3")
+        cap_view_weight(video_path, phases, xml_no_global, mode)
     else:
         print("error")             
          
