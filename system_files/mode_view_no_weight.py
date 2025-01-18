@@ -32,6 +32,7 @@ def cap_view_no_weight(video_path, phases, xml_no, mode):
 
     buffered_frames = [] 
     prediction_buffer = []
+    frame_phase_changed = []
     prediction_dict = {}
     exit_flag = False #終了処理
     
@@ -107,7 +108,7 @@ def cap_view_no_weight(video_path, phases, xml_no, mode):
         frame_No += 1
 
     executor.shutdown(wait=True)  
-    gen_conf_matrix(results, xml_no, mode)
+    gen_conf_matrix(results, xml_no, mode, frame_phase_changed)
     gen_ribbon_plot_no_weight(prediction_dict, xml_no)
 
     cv2.destroyAllWindows() 

@@ -65,7 +65,7 @@ def process_videos(xml_number):
             if video_writer is not None:
                 video_writer.release()
             if new_phase is not None:
-                save_dir = os.path.join("master_thesis", "data", "evaluation", f"phase{new_phase}")
+                save_dir = os.path.join("master_thesis", "data", "cropped_video", f"phase{new_phase}")
                 os.makedirs(save_dir, exist_ok=True)
                 video_writer, file_path = start_new_video(save_dir, fps, new_phase, frame_width, frame_height)
             current_phase = new_phase
@@ -78,7 +78,7 @@ def process_videos(xml_number):
     cap.release()
 
 # XMLファイルの範囲指定
-for i in range(31, 41):  
+for i in range(1, 21):  
     process_videos(i)
 
                

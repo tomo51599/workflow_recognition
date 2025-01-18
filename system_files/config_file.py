@@ -1,5 +1,5 @@
 # モデルのパス
-model_path = "master_thesis/system_files/test_model_9.keras"
+model_path = "master_thesis/system_files/models/test_model_13.keras"
 
 #evaluation_visualize用のビデオ保存パス
 save_dir = "master_thesis/data/visualize_evaluation"
@@ -21,10 +21,8 @@ def cal_weight(weight):
         weight_list = [0, 0, 0, 1, 1, 0]
     elif weight == 5:
         weight_list = [0, 0, 0, 0, 1, 1]
-    elif weight == 6:
-        weight_list = [0, 0, 0, 0, 0, 1]
     else:
-        weight_list = [1] * 6
+        weight_list = [0, 0, 0, 0, 0, 1]
 
     return weight_list
 

@@ -17,8 +17,9 @@ def count_prediction(predicted_phase, current_phase, results):
     return results
 
 #混合行列を生成する関数
-def gen_conf_matrix(results, xml_no, mode):
+def gen_conf_matrix(results, xml_no, mode, frame_phase_changed):
     
+    plt.close()
     size = len(results)
     conf_matrix = np.zeros((size, size))
     
@@ -27,19 +28,19 @@ def gen_conf_matrix(results, xml_no, mode):
             conf_matrix[actual -1, predicted -1] = count
     
     conf_matrix = conf_matrix.astype(int)
-    print(conf_matrix)
-    cal_evaluation(conf_matrix, xml_no, mode)        
+    cal_evaluation(conf_matrix, xml_no, mode, frame_phase_changed)        
             
     plt.figure(figsize = (10, 8))
     sns.heatmap(conf_matrix, annot = True, fmt = "d", cmap= "viridis", xticklabels=[f'phase{i}' for i in range(1, size+1)], yticklabels=[f'phase{i}' for i in range(1, size+1)])
     plt.ylabel('Actual Phase')
+    plt.xlabel('Predicted Phase')
     plt.title(f'Confusion Matrix of Action Recognition for Test_{xml_no}_{mode}')
     plt.savefig(f'/home/master_thesis/results/confusion_matrix_{xml_no}_{mode}.png')    
     
     plt.figure()     
     
 #評価値を計算する関数    
-def cal_evaluation(conf_matrix, xml_no, mode):
+def cal_evaluation(conf_matrix, xml_no, mode, frame_phase_changed):
     TP = np.diag(conf_matrix)
     FP = np.sum(conf_matrix, axis = 0) - TP
     FN = np.sum(conf_matrix, axis = 1) - TP
@@ -59,19 +60,72 @@ def cal_evaluation(conf_matrix, xml_no, mode):
         log_file.write(f"precision: {precision}\n")
         log_file.write(f"recall: {recall}\n")
         log_file.write(f"f1_score: {f1_score}\n")
+        log_file.write(f"{str(frame_phase_changed)}\n")
         log_file.write(f"Confusion Matrix:\n{conf_matrix}\n\n")
         
     print(f"precision{precision},recall{recall},f1-score{f1_score}")
+    
+#混合行列を生成する関数(重みなし)
+def gen_conf_matrix_no_weight(results, xml_no):
+    
+    plt.close()
+    size = len(results)
+    conf_matrix = np.zeros((size, size))
+    
+    for actual, predicted_counts in results.items():
+        for predicted, count in predicted_counts.items():
+            conf_matrix[actual -1, predicted -1] = count
+    
+    conf_matrix = conf_matrix.astype(int)
+    cal_evaluation_no_weight(conf_matrix, xml_no)        
+            
+    plt.figure(figsize = (10, 8))
+    sns.heatmap(conf_matrix, annot = True, fmt = "d", cmap= "viridis", xticklabels=[f'phase{i}' for i in range(1, size+1)], yticklabels=[f'phase{i}' for i in range(1, size+1)])
+    plt.ylabel('Actual Phase')
+    plt.xlabel('Predicted Phase')
+    plt.title(f'Confusion Matrix of Action Recognition for Test_{xml_no}_no_weight')
+    plt.savefig(f'/home/master_thesis/results/confusion_matrix_{xml_no}_no_weight.png')    
+    
+    plt.figure()     
+    
+#評価値を計算する関数(重みなし)    
+def cal_evaluation_no_weight(conf_matrix, xml_no):
+    TP = np.diag(conf_matrix)
+    FP = np.sum(conf_matrix, axis = 0) - TP
+    FN = np.sum(conf_matrix, axis = 1) - TP
+    
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    
+    precision = np.nan_to_num(precision)
+    recall = np.nan_to_num(recall)
+    f1_score = np.nan_to_num(f1_score) 
+    
+    log_path = f"master_thesis/results/evaluation{xml_no}_no_weight.log"
+    os.makedirs(os.path.dirname(f"master_thesis/results/evaluation_log{xml_no}.txt"), exist_ok=True)
+    
+    with open(log_path, "w") as log_file:
+        log_file.write(f"precision: {precision}\n")
+        log_file.write(f"recall: {recall}\n")
+        log_file.write(f"f1_score: {f1_score}\n")
+        log_file.write(f"Confusion Matrix:\n{conf_matrix}\n\n")
+        
+    print(f"precision{precision},recall{recall},f1-score{f1_score}")    
               
 #リボン図を生成する関数(重みなし)
-def gen_ribbon_plot_no_weight(prediction_dict, xml_no):
+def gen_ribbon_plot_no_weight(prediction_dict, xml_no, mode):
     plt.rcParams.update({'font.size': 14}) 
     
     colors = ['grey', 'orange', 'yellow', 'blue', 'black', 'green', 'purple']
     
     frames = sorted(prediction_dict.keys())
     
-    predicted_labels = [int(prediction_dict[frame]['label'][0]) if isinstance(prediction_dict[frame]['label'], np.ndarray) else int(prediction_dict[frame]['label']) for frame in frames]
+    if mode == "no_weight":
+        predicted_labels = [int(prediction_dict[frame]['label'][0]) if isinstance(prediction_dict[frame]['label'], np.ndarray) else int(prediction_dict[frame]['label']) for frame in frames]   
+    elif mode == "weight":
+        predicted_labels = [int(prediction_dict[frame]['no_weight'][0]) if isinstance(prediction_dict[frame]['no_weight'], np.ndarray) else int(prediction_dict[frame]['no_weight']) for frame in frames]
+        
     second_labels = [int(prediction_dict[frame]['second_label']) + 1 for frame in frames]#バグ応急処置
     actual_labels = [int(prediction_dict[frame]['actual_label']) if prediction_dict[frame]['actual_label'] is not None else 0 for frame in frames]
     
@@ -245,3 +299,63 @@ def draw_graph(frame_show, prob_graph_weight):
     )
     
     return frame_show
+
+#全体における折れ線グラフを描画する関数(重みなし)
+def plot_confidence_graph_no_weight(prob_graph_no_weight, xml_no):
+    
+    plt.clf()#プロットのクリア
+    plt.figure(figsize=(15, 3))
+    colors = ['orange', 'yellow', 'blue', 'black', 'green', 'purple']
+    phases = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6']
+    
+    # フレームごとにプロット
+    for idx, phase in enumerate(phases):
+        confidence_values = [frame[idx] for frame in prob_graph_no_weight]
+        plt.plot(confidence_values, label=phase, color=colors[idx])
+    
+    output_file = f"master_thesis/results/confidence_graph_no_weight_{xml_no}.png"
+
+    # グラフの装飾
+    plt.xlabel('Steps')
+    plt.ylabel('Confidence')
+    plt.title(f'Confidence over Frames_no_weight_{xml_no}')
+    plt.grid(True)
+    plt.xlim(0, len(prob_graph_no_weight))
+    plt.ylim(0, 1)
+    plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+    plt.tight_layout()#余白調整
+    
+    
+    # 画像を保存
+    plt.savefig(output_file, format='png')
+    plt.close()
+
+#全体における折れ線グラフを描画する関数(重みあり)
+def plot_confidence_graph(prob_graph_weight, xml_no, mode):
+    
+    plt.clf()#プロットのクリア
+    plt.figure(figsize=(15, 3))
+    colors = ['orange', 'yellow', 'blue', 'black', 'green', 'purple']
+    phases = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6']
+    
+    # フレームごとにプロット
+    for idx, phase in enumerate(phases):
+        confidence_values = [frame[idx] for frame in prob_graph_weight]
+        plt.plot(confidence_values, label=phase, color=colors[idx])
+    
+    output_file = f"master_thesis/results/confidence_graph_{mode}_{xml_no}.png"
+
+    # グラフの装飾
+    plt.xlabel('Steps')
+    plt.ylabel('Confidence')
+    plt.title(f'Confidence over Frames_{mode}_{xml_no}')
+    plt.grid(True)
+    plt.xlim(0, len(prob_graph_weight))
+    plt.ylim(0, 1)
+    plt.legend(loc = "upper right", bbox_to_anchor = (1.15, 1))
+    plt.tight_layout()#余白調整
+    
+    
+    # 画像を保存
+    plt.savefig(output_file, format='png')
+    plt.close()

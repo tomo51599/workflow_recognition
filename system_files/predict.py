@@ -64,23 +64,28 @@ def determine_dominant_phase(predicted_list):
 def apply_weights_to_prediction(predict_probabilities, weight):
 
     weight_list = cal_weight(weight)
-    print(weight_list)
     
     # 重みを確率に適用
     adjusted_probabilities = predict_probabilities * np.array(weight_list)
     
     sum_probabilities = np.sum(adjusted_probabilities, keepdims = True)
+    print(sum_probabilities)
     adjusted_probabilities = adjusted_probabilities / sum_probabilities
     
-    return adjusted_probabilities
+    return adjusted_probabilities, weight_list
 
 #最終的な推論結果を出力
-def determine_adjusted_prediction(adjusted_probabilities, class_names):
+def determine_adjusted_prediction(adjusted_probabilities):
+   
+    class_names = ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6']
+   
     if adjusted_probabilities.ndim == 1:
         adjusted_probabilities = np.atleast_2d(adjusted_probabilities)
+   
     adjusted_prediction_indices = np.argmax(adjusted_probabilities, axis=1)
-    adjusted_predictions = [class_names[idx] for idx in adjusted_prediction_indices]
-    return adjusted_predictions
+    adjusted_class_label = [class_names[idx] for idx in adjusted_prediction_indices]
+   
+    return adjusted_prediction_indices +1, adjusted_class_label
 
 
 #モデルのロード

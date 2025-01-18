@@ -19,54 +19,7 @@ def determine_dominant_phase(predicted_list):
     else:
         return None 
 
-#重みを定義 
-def cal_weight(weight):
 
-    weight_list = [0] * 6
-    
-    if weight == 0:
-        weight_list[0] = 1
-    elif weight == 1:
-        weight_list[:2] = [1, 1]
-    elif weight == 2:
-        weight_list[:3] = [0, 1, 1]
-    elif weight == 3:
-        weight_list[1:4] = [0, 1, 1]
-    elif weight == 4:
-        weight_list[2:5] = [0, 1, 1]
-    elif weight == 5:
-        weight_list[3:6] = [0, 1, 1]
-    elif weight == 6:
-        weight_list[4:6] = [0, 1]
-    else:
-        weight_list = [1] * 6
-
-    return weight_list
-
-#重みがけを実行    
-def apply_weights_to_prediction(predict_probabilities, weight):
-
-    weight_list = cal_weight(weight)
-    
-    adjusted_probabilities = predict_probabilities * np.array(weight_list)#重みを確率に適用
-    
-    sum_probabilities = np.sum(adjusted_probabilities, keepdims = True)
-    adjusted_probabilities = adjusted_probabilities / sum_probabilities
-    
-    return adjusted_probabilities, weight_list
-
-#最終的な推論結果を出力
-def determine_adjusted_prediction(adjusted_probabilities):
-   
-    class_names = ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6']
-   
-    if adjusted_probabilities.ndim == 1:
-        adjusted_probabilities = np.atleast_2d(adjusted_probabilities)
-   
-    adjusted_prediction_indices = np.argmax(adjusted_probabilities, axis=1)
-    adjusted_class_label = [class_names[idx] for idx in adjusted_prediction_indices]
-   
-    return adjusted_prediction_indices +1, adjusted_class_label
 
 #推定値のカウント
 def count_prediction(predicted_phase_No, current_phase, results):
@@ -104,6 +57,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
     predicted_list =[]
     frame_phase_changed = []
     prob_graph_weight = []
+    prob_graph_no_weight = []
      
     determined_phase = None
     dominant_phase = None
@@ -113,6 +67,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
     exit_flag = False #終了処理
     
     results = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
+    results_no_weight = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
     
     while cap.isOpened() and not exit_flag:  
         ret, frame = cap.read()
@@ -136,7 +91,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
            test_ds = test_ds.batch(batch_size)
            
            predicted, predicted_label= get_actual_predicted_labels(test_ds)#推論を実行、確率ベクトルと推論したラベルを取得
-           actual_label_prob = get_actual_label_prob(predicted, current_phase)#真値の信頼度を取得　ベクトル
+           actual_label_prob = get_actual_label_prob(predicted, current_phase)#真値の信頼度を取得　float型
            first_largest_prob = get_first_predict_labels(predicted)#最も信頼度の高いクラスの信頼度を取得　float型数値
            second_largest_class, second_largest_prob = get_second_predict_labels(predicted)#2番目に信頼度が高いクラスと信頼度を取得　float型数値
            
@@ -144,6 +99,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
            adjusted_predictions, adjusted_class_label = determine_adjusted_prediction(adjusted_probabilities)#最終推論を決定　クラス番号とクラスラベル
            predicted_list.append(adjusted_class_label)#支配的なフェーズを判定するリストに保存
            
+           prob_graph_no_weight.append(predicted)
            prob_graph_weight.append(adjusted_probabilities)
            
            if len(predicted_list) > 9:
@@ -167,15 +123,19 @@ def cap_view_weight(video_path, phases, xml_no, mode):
                               'second_label': second_largest_class, 'second_largest_prob': second_largest_prob}
            prediction_buffer.append(last_prediction) 
            
+           for predicted_phase in predicted_label:
+                results_no_weight  = count_prediction(predicted_phase, current_phase, results_no_weight) #結果のカウント(重みなし)
+                
            for predicted_phase in adjusted_predictions:
                 results  = count_prediction(predicted_phase, current_phase, results) #結果のカウント
-                
+
                 if dominant_phase is not None:
-                    dominant_phase_dic = int(dominant_phase[5])
+                    dominant_phase_dic = int(dominant_phase[5])#フェーズ番号を取得phase"1" →整数型に変換
                 
                 prediction_dict[frame_No] = {'confidence': predicted, 'label': predicted_phase, 'prob': first_largest_prob, 
-                                        'actual_label': current_phase, 'actual_label_prob': actual_label_prob,
-                                        'dominant_label': dominant_phase_dic, 'second_largest_prob': second_largest_prob}
+                                        'actual_label': current_phase, 'actual_label_prob': actual_label_prob, 'no_weight': int(predicted_label[0]),
+                                        'dominant_label': dominant_phase_dic, 'second_label': second_largest_class, 'second_largest_prob': second_largest_prob}
+                print(prediction_dict[frame_No])
 
         #フレームバッファ関連処理
         if len(buffered_frames) < 97:
@@ -209,7 +169,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
                 cv2.putText(frame_show, prediction_list_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
                 cv2.putText(frame_show, dominant_phase_text, (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
                 
-            frame_show = draw_graph(frame_show, prob_graph_weight)#左下に補正信頼度の折れ線グラフの描画※実行速度への影響大    
+            #frame_show = draw_graph(frame_show, prob_graph_weight)#左下に補正信頼度の折れ線グラフの描画※実行速度への影響大    
 
             cv2.imshow("video", frame_show)
             
@@ -218,8 +178,12 @@ def cap_view_weight(video_path, phases, xml_no, mode):
         frame_No += 1
 
     executor.shutdown(wait=True)  
-    gen_conf_matrix(results, xml_no, mode)
-    gen_ribbon_plot_weight(prediction_dict, xml_no)
+    gen_conf_matrix(results, xml_no, mode, frame_phase_changed)#混合行列の生成(重みあり)
+    gen_conf_matrix_no_weight(results_no_weight, xml_no)#混合行列の生成(重みなし)
+    gen_ribbon_plot_weight(prediction_dict, xml_no)#リボン図の生成(重みあり)
+    gen_ribbon_plot_no_weight(prediction_dict, xml_no, mode)#リボン図の生成(重みあり)
+    plot_confidence_graph(prob_graph_weight, xml_no, mode)#折れ線グラフの生成(重みあり)
+    plot_confidence_graph_no_weight(prob_graph_no_weight, xml_no)#折れ線グラフの生成(重みなし)
 
     cv2.destroyAllWindows() 
     cap.release()  
