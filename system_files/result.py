@@ -16,7 +16,7 @@ def count_prediction(predicted_phase, current_phase, results):
     
     return results
 
-#混合行列を生成する関数
+#混合行列を生成する関数(重みのみ)
 def gen_conf_matrix(results, xml_no, mode, frame_phase_changed):
     
     plt.close()
@@ -39,7 +39,7 @@ def gen_conf_matrix(results, xml_no, mode, frame_phase_changed):
     
     plt.figure()     
     
-#評価値を計算する関数    
+#評価値を計算する関数(重みのみ)   
 def cal_evaluation(conf_matrix, xml_no, mode, frame_phase_changed):
     TP = np.diag(conf_matrix)
     FP = np.sum(conf_matrix, axis = 0) - TP
@@ -57,6 +57,7 @@ def cal_evaluation(conf_matrix, xml_no, mode, frame_phase_changed):
     os.makedirs(os.path.dirname(f"master_thesis/results/evaluation_log{xml_no}.txt"), exist_ok=True)
     
     with open(log_path, "w") as log_file:
+        log_file.write("weight_only")
         log_file.write(f"precision: {precision}\n")
         log_file.write(f"recall: {recall}\n")
         log_file.write(f"f1_score: {f1_score}\n")
@@ -64,6 +65,53 @@ def cal_evaluation(conf_matrix, xml_no, mode, frame_phase_changed):
         log_file.write(f"Confusion Matrix:\n{conf_matrix}\n\n")
         
     print(f"precision{precision},recall{recall},f1-score{f1_score}")
+    
+#混合行列を生成する関数(dominant_phase)
+def gen_conf_matrix_queue(results, xml_no, mode):
+    
+    plt.close()
+    size = len(results)
+    conf_matrix = np.zeros((size, size))
+    
+    for actual, predicted_counts in results.items():
+        for predicted, count in predicted_counts.items():
+            conf_matrix[actual -1, predicted -1] = count
+    
+    conf_matrix_queue = conf_matrix.astype(int)
+    cal_evaluation_queue(conf_matrix_queue, xml_no, mode)        
+            
+    plt.figure(figsize = (10, 8))
+    sns.heatmap(conf_matrix, annot = True, fmt = "d", cmap= "viridis", xticklabels=[f'phase{i}' for i in range(1, size+1)], yticklabels=[f'phase{i}' for i in range(1, size+1)])
+    plt.ylabel('Actual Phase')
+    plt.xlabel('Predicted Phase')
+    plt.title(f'Confusion Matrix of Action Recognition for Test_{xml_no}_{mode}_queue')
+    plt.savefig(f'/home/master_thesis/results/confusion_matrix_{xml_no}_{mode}_queue.png')    
+    
+    plt.figure()
+    
+#評価値を計算する関数(dominant_phase)    
+def cal_evaluation_queue(conf_matrix_queue, xml_no, mode):
+    TP = np.diag(conf_matrix_queue)
+    FP = np.sum(conf_matrix_queue, axis = 0) - TP
+    FN = np.sum(conf_matrix_queue, axis = 1) - TP
+    
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    
+    precision = np.nan_to_num(precision)
+    recall = np.nan_to_num(recall)
+    f1_score = np.nan_to_num(f1_score) 
+    
+    log_path = f"master_thesis/results/evaluation{xml_no}_{mode}.log"
+    os.makedirs(os.path.dirname(f"master_thesis/results/evaluation_log{xml_no}.txt"), exist_ok=True)
+    
+    with open(log_path, "w") as log_file:
+        log_file.write("queue")
+        log_file.write(f"precision: {precision}\n")
+        log_file.write(f"recall: {recall}\n")
+        log_file.write(f"f1_score: {f1_score}\n")
+        log_file.write(f"Confusion Matrix:\n{conf_matrix_queue}\n\n")             
     
 #混合行列を生成する関数(重みなし)
 def gen_conf_matrix_no_weight(results, xml_no):

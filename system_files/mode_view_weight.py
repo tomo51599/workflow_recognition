@@ -131,6 +131,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
 
                 if dominant_phase is not None:
                     dominant_phase_dic = int(dominant_phase[5])#フェーズ番号を取得phase"1" →整数型に変換
+                    results_queue = count_prediction(dominant_phase, current_phase, results_queue) #追加
                 
                 prediction_dict[frame_No] = {'confidence': predicted, 'label': predicted_phase, 'prob': first_largest_prob, 
                                         'actual_label': current_phase, 'actual_label_prob': actual_label_prob, 'no_weight': int(predicted_label[0]),
@@ -180,6 +181,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
     executor.shutdown(wait=True)  
     gen_conf_matrix(results, xml_no, mode, frame_phase_changed)#混合行列の生成(重みあり)
     gen_conf_matrix_no_weight(results_no_weight, xml_no)#混合行列の生成(重みなし)
+    gen_conf_matrix_queue(results_queue, xml_no, mode)#混合行列の生成(queue)
     gen_ribbon_plot_weight(prediction_dict, xml_no)#リボン図の生成(重みあり)
     gen_ribbon_plot_no_weight(prediction_dict, xml_no, mode)#リボン図の生成(重みあり)
     plot_confidence_graph(prob_graph_weight, xml_no, mode)#折れ線グラフの生成(重みあり)
