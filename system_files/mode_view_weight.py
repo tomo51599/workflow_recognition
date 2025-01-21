@@ -23,11 +23,18 @@ def determine_dominant_phase(predicted_list):
 
 #推定値のカウント
 def count_prediction(predicted_phase_No, current_phase, results):
-   
     if current_phase is not None:
+        # 必要ならキーを初期化
+        if current_phase not in results:
+            results[current_phase] = {}
+        if predicted_phase_No not in results[current_phase]:
+            results[current_phase][predicted_phase_No] = 0
+
+        # カウントをインクリメント
         results[current_phase][predicted_phase_No] += 1
-    
+
     return results
+
 
 #動画メイン処理            
 def cap_view_weight(video_path, phases, xml_no, mode):
@@ -60,13 +67,14 @@ def cap_view_weight(video_path, phases, xml_no, mode):
     prob_graph_no_weight = []
      
     determined_phase = None
-    dominant_phase = None
+    dominant_phase = "phase1"
     dominant_phase_dic = None
     
     prediction_dict = {}
     exit_flag = False #終了処理
     
     results = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
+    results_queue = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
     results_no_weight = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
     
     while cap.isOpened() and not exit_flag:  
@@ -128,10 +136,11 @@ def cap_view_weight(video_path, phases, xml_no, mode):
                 
            for predicted_phase in adjusted_predictions:
                 results  = count_prediction(predicted_phase, current_phase, results) #結果のカウント
+                print(results_queue)
 
                 if dominant_phase is not None:
                     dominant_phase_dic = int(dominant_phase[5])#フェーズ番号を取得phase"1" →整数型に変換
-                    results_queue = count_prediction(dominant_phase, current_phase, results_queue) #追加
+                    results_queue = count_prediction(dominant_phase_dic, current_phase, results_queue) #追加
                 
                 prediction_dict[frame_No] = {'confidence': predicted, 'label': predicted_phase, 'prob': first_largest_prob, 
                                         'actual_label': current_phase, 'actual_label_prob': actual_label_prob, 'no_weight': int(predicted_label[0]),

@@ -6,7 +6,7 @@ import pandas as pd
 os.chdir("/home/master_thesis")
 
 # ログファイルが格納されているディレクトリ
-directory_path = "results/model_13/weight_log"
+directory_path = "results/model_13/weight_log_queue"
 
 # クラス数
 num_classes = 6

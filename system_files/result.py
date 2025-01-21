@@ -71,7 +71,7 @@ def gen_conf_matrix_queue(results, xml_no, mode):
     
     plt.close()
     size = len(results)
-    conf_matrix = np.zeros((size, size))
+    conf_matrix = np.zeros((size, size), dtype=int)
     
     for actual, predicted_counts in results.items():
         for predicted, count in predicted_counts.items():
@@ -103,11 +103,11 @@ def cal_evaluation_queue(conf_matrix_queue, xml_no, mode):
     recall = np.nan_to_num(recall)
     f1_score = np.nan_to_num(f1_score) 
     
-    log_path = f"master_thesis/results/evaluation{xml_no}_{mode}.log"
-    os.makedirs(os.path.dirname(f"master_thesis/results/evaluation_log{xml_no}.txt"), exist_ok=True)
+    log_path = f"master_thesis/results/evaluation{xml_no}_{mode}_queue.log"
+    os.makedirs(os.path.dirname(f"master_thesis/results/evaluation_log{xml_no}_queue.txt"), exist_ok=True)
     
     with open(log_path, "w") as log_file:
-        log_file.write("queue")
+        log_file.write("queue\n")
         log_file.write(f"precision: {precision}\n")
         log_file.write(f"recall: {recall}\n")
         log_file.write(f"f1_score: {f1_score}\n")
