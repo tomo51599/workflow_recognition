@@ -69,7 +69,7 @@ def apply_weights_to_prediction(predict_probabilities, weight):
     adjusted_probabilities = predict_probabilities * np.array(weight_list)
     
     sum_probabilities = np.sum(adjusted_probabilities, keepdims = True)
-    print(sum_probabilities)
+    #print(sum_probabilities)　デバック用
     adjusted_probabilities = adjusted_probabilities / sum_probabilities
     
     return adjusted_probabilities, weight_list

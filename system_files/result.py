@@ -4,9 +4,11 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import plotly.graph_objects as go
+import csv
 
 from matplotlib.patches import Rectangle
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from collections import defaultdict
 
 #結果をカウントする関数
 def count_prediction(predicted_phase, current_phase, results):
@@ -407,3 +409,63 @@ def plot_confidence_graph(prob_graph_weight, xml_no, mode):
     # 画像を保存
     plt.savefig(output_file, format='png')
     plt.close()
+
+#F1@10,F1@25,F1@50を計算する関数
+def calc_F1_thresholds_and_avg(calc_F1_dict, xml_No):
+    thresholds = [0.1, 0.25, 0.5]
+    metrics = {
+        "dominant_label": {threshold: {"TP": 0, "FP": 0, "FN": 0} for threshold in thresholds},
+        "label": {threshold: {"TP": 0, "FP": 0, "FN": 0} for threshold in thresholds},
+        "no_weight": {threshold: {"TP": 0, "FP": 0, "FN": 0} for threshold in thresholds},
+    }
+
+    # Calculate TP, FP, FN for each threshold and label type
+    for frame_no, data in calc_F1_dict.items():
+        actual_label = data["actual_label"]
+        confidence = data["confidence"]
+
+        for label_type in ["dominant_label", "label", "no_weight"]:
+            predicted_label = data[label_type]
+
+            for threshold in thresholds:
+                # IoU approximation: confidence[predicted_label - 1] >= threshold
+                if confidence[predicted_label - 1] >= threshold:
+                    if predicted_label == actual_label:
+                        metrics[label_type][threshold]["TP"] += 1
+                    else:
+                        metrics[label_type][threshold]["FP"] += 1
+                elif predicted_label != actual_label:
+                    metrics[label_type][threshold]["FN"] += 1
+
+    # Calculate F1 scores
+    F1_scores = defaultdict(dict)
+    for label_type in metrics:
+        F1_avg_sum = 0
+        for threshold, counts in metrics[label_type].items():
+            TP = counts["TP"]
+            FP = counts["FP"]
+            FN = counts["FN"]
+
+            precision = TP / (TP + FP) if TP + FP > 0 else 0
+            recall = TP / (TP + FN) if TP + FN > 0 else 0
+            F1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
+
+            # Round results to 3 decimal places
+            F1_scores[label_type][f"F1@{int(threshold * 100)}"] = round(F1, 3)
+            F1_avg_sum += F1
+
+        # Calculate F1AVG and round to 3 decimal places
+        F1_scores[label_type]["F1AVG"] = round(F1_avg_sum / len(thresholds), 3)
+
+    # Save results to CSV
+    output_file = os.path.join("master_thesis","results", f"F1@{xml_No}.csv")
+
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Label Type", "Metric", "Value"])
+
+        for label_type, scores in F1_scores.items():
+            for metric, value in scores.items():
+                writer.writerow([label_type, metric, value])
+
+    return F1_scores

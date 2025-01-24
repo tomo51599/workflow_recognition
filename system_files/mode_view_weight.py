@@ -71,6 +71,9 @@ def cap_view_weight(video_path, phases, xml_no, mode):
     dominant_phase_dic = None
     
     prediction_dict = {}
+    calc_F1_dict = {}
+    calc_F1_list =[]
+
     exit_flag = False #終了処理
     
     results = {phase: {predicted_phase: 0 for predicted_phase in range(1, 7)} for phase in range(1, 7)}
@@ -87,7 +90,7 @@ def cap_view_weight(video_path, phases, xml_no, mode):
             exit_flag = True
             break
        
-        if  cv2.waitKey(5) & 0xFF == ord("q"):
+        if  cv2.waitKey(4) & 0xFF == ord("q"):
             exit_flag = True 
         
         #48フレーム目以降で推論を開始
@@ -129,8 +132,8 @@ def cap_view_weight(video_path, phases, xml_no, mode):
                               'confidence': predicted, 'label': predicted_label, 
                               'actual_label': current_phase,'actual_prob': actual_label_prob,
                               'second_label': second_largest_class, 'second_largest_prob': second_largest_prob}
-           prediction_buffer.append(last_prediction) 
-           
+            
+       
            for predicted_phase in predicted_label:
                 results_no_weight  = count_prediction(predicted_phase, current_phase, results_no_weight) #結果のカウント(重みなし)
                 
@@ -145,7 +148,8 @@ def cap_view_weight(video_path, phases, xml_no, mode):
                 prediction_dict[frame_No] = {'confidence': predicted, 'label': predicted_phase, 'prob': first_largest_prob, 
                                         'actual_label': current_phase, 'actual_label_prob': actual_label_prob, 'no_weight': int(predicted_label[0]),
                                         'dominant_label': dominant_phase_dic, 'second_label': second_largest_class, 'second_largest_prob': second_largest_prob}
-                print(prediction_dict[frame_No])
+                
+                calc_F1_dict[frame_No] = {'label': predicted_phase,'dominant_label': dominant_phase_dic,'no_weight': int(predicted_label[0]),'actual_label': current_phase, 'confidence': predicted}
 
         #フレームバッファ関連処理
         if len(buffered_frames) < 97:
@@ -195,7 +199,9 @@ def cap_view_weight(video_path, phases, xml_no, mode):
     gen_ribbon_plot_no_weight(prediction_dict, xml_no, mode)#リボン図の生成(重みあり)
     plot_confidence_graph(prob_graph_weight, xml_no, mode)#折れ線グラフの生成(重みあり)
     plot_confidence_graph_no_weight(prob_graph_no_weight, xml_no)#折れ線グラフの生成(重みなし)
-
+    calc_F1_thresholds_and_avg(calc_F1_dict, xml_no)
+    
+    
     cv2.destroyAllWindows() 
     cap.release()  
  
